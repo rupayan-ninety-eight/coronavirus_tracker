@@ -1,25 +1,61 @@
 // See https://github.com/dialogflow/dialogflow-fulfillment-nodejs
 // for Dialogflow fulfillment library docs, samples, and to report issues
 'use strict';
- 
+
 const functions = require('firebase-functions');
-const {WebhookClient} = require('dialogflow-fulfillment');
-const {Card, Suggestion} = require('dialogflow-fulfillment');
- 
+const { WebhookClient } = require('dialogflow-fulfillment');
+const bent = require('bent');
+const getJSON = bent('json');
+
 process.env.DEBUG = 'dialogflow:debug'; // enables lib debugging statements
- 
+
 exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, response) => {
   const agent = new WebhookClient({ request, response });
   console.log('Dialogflow Request headers: ' + JSON.stringify(request.headers));
   console.log('Dialogflow Request body: ' + JSON.stringify(request.body));
- 
+
   function welcome(agent) {
     agent.add(`Welcome to my agent!`);
   }
- 
+
   function fallback(agent) {
     agent.add(`I didn't understand`);
     agent.add(`I'm sorry, can you try again?`);
+  }
+
+  function worldwideLatestStats(agent) {
+    const type = agent.parameters.type;
+    return getJSON('https://coronavirus-tracker-api.herokuapp.com/v2/latest?source=jhu').then((result) => {
+      agent.add("According to my latest data");
+
+      if (type.length >= 3) {
+        agent.add(`There are currently ${result.latest.confirmed} positive cases, ${result.latest.deaths} deaths and ${result.latest.recovered} recoveries. This is not good for the world.`);
+        return;
+      }
+
+      for (var i = 0; i < type.length; i++) {
+        if (i == 1) {
+          agent.add('In addition,');
+        }
+        switch (type[i]) {
+          case 'confirmed':
+            agent.add(`There are currently ${result.latest.confirmed} cases of COVID-19 worldwide`);
+            break;
+          case 'deaths':
+            agent.add(`There are currently ${result.latest.deaths} deaths due to COVID-19 worldwide`);
+            break;
+          case 'recovered':
+            agent.add(`There are currently ${result.latest.recovered} people who have recovered from COVID-19 worldwide. I hope this number rises quickly.`);
+            break;
+          default: //All condition
+            agent.add(`There are currently ${result.latest.confirmed} positive cases, ${result.latest.deaths} deaths and ${result.latest.recovered} recoveries. This is not good for the world.`);
+        }
+      }
+
+
+    }).catch((error) => {
+      console.error(error);
+    });
   }
 
   // // Uncomment and edit to make your own intent handler
@@ -55,6 +91,7 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
   let intentMap = new Map();
   intentMap.set('Default Welcome Intent', welcome);
   intentMap.set('Default Fallback Intent', fallback);
+  intentMap.set('Worldwide Latest Stats', worldwideLatestStats);
   // intentMap.set('your intent name here', yourFunctionHandler);
   // intentMap.set('your intent name here', googleAssistantHandler);
   agent.handleRequest(intentMap);
