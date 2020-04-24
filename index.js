@@ -58,6 +58,60 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
     });
   }
 
+  function countryLatestStats(agent) {
+    const type = agent.parameters.type;
+    const countryListInitial = agent.parameters.country;
+    const countryList = [];
+    const countryName = [];
+    const countryCode = [];
+
+    for (var cnt = 0; cnt < countryListInitial.length; cnt++) {
+      countryList.push(countryListInitial[cnt]);
+      countryName.push(countryList[cnt].name);
+      countryCode.push(countryList[cnt]["alpha-2"].toLowerCase());
+    }
+
+    for (var j = 0; j < countryCode.length; j++) {
+      return getJSON(`https://coronavirus-tracker-api.herokuapp.com/v2/locations?source=jhu&country_code=${countryCode[j]}`).then((result) => {
+
+        if (j >= 1) {
+          agent.add("Now, for the next country");
+        }
+
+        agent.add("According to my latest data");
+
+        if (type.length >= 3) {
+          agent.add(`There are currently ${result.latest.confirmed} positive cases, ${result.latest.deaths} deaths and ${result.latest.recovered} recoveries. This is not good for ${countryName[j]}.`);
+          return;
+        }
+
+        for (var i = 0; i < type.length; i++) {
+          if (i == 1) {
+            agent.add('In addition,');
+          }
+          switch (type[i]) {
+            case 'confirmed':
+              agent.add(`There are currently ${result.latest.confirmed} cases of COVID-19 in ${countryName[j]}`);
+              break;
+            case 'deaths':
+              agent.add(`There are currently ${result.latest.deaths} deaths due to COVID-19 in ${countryName[j]}`);
+              break;
+            case 'recovered':
+              agent.add(`There are currently ${result.latest.recovered} people who have recovered from COVID-19 in ${countryName[j]}. I hope this number rises quickly.`);
+              break;
+            default: //All condition
+              agent.add(`There are currently ${result.latest.confirmed} positive cases, ${result.latest.deaths} deaths and ${result.latest.recovered} recoveries. This is not good for the ${countryName[j]}.`);
+          }
+        }
+      }).catch((error) => {
+        console.error(error);
+      });
+
+    }
+  }
+
+
+
   // // Uncomment and edit to make your own intent handler
   // // uncomment `intentMap.set('your intent name here', yourFunctionHandler);`
   // // below to get this function to be run when a Dialogflow intent is matched
@@ -92,6 +146,8 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
   intentMap.set('Default Welcome Intent', welcome);
   intentMap.set('Default Fallback Intent', fallback);
   intentMap.set('Worldwide Latest Stats', worldwideLatestStats);
+  intentMap.set('Country Latest Stats', countryLatestStats);
+  intentMap.set('State Latest Stats', stateLatestStats);
   // intentMap.set('your intent name here', yourFunctionHandler);
   // intentMap.set('your intent name here', googleAssistantHandler);
   agent.handleRequest(intentMap);
